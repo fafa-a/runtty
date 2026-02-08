@@ -1,6 +1,7 @@
 const std = @import("std");
 const webui = @import("webui");
 const handlers = @import("rpc.zig");
+const projects = @import("project_runner.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -16,6 +17,7 @@ pub fn main() !void {
 
     const window = webui.newWindow();
     handlers.bindHandlers(window);
+    projects.bindProjectHandlers(window);
 
     // Set fixed port 3210 for HTTP API and UI
     window.setPort(3210) catch |e| {

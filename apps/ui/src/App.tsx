@@ -10,11 +10,33 @@ interface Project {
 // WebUI is loaded via script tag in index.html
 declare const webui: {
   call: (eventId: string, data?: string) => Promise<string>
+  bind: (eventId: string, callback: (data: string) => void) => void
 }
 
 function App() {
   const [projects, setProjects] = createSignal<Project[]>([])
   const [error, setError] = createSignal<string | null>(null)
+  const [runningProjects, setRunningProjects] = createSignal<Set<string>>(new Set())
+
+  // Listen for project status updates from backend
+  if (typeof webui !== 'undefined' && webui.bind) {
+    webui.bind("project.status", (data: string) => {
+      const status = JSON.parse(data)
+      if (status.status === "running") {
+        setRunningProjects(prev => {
+          const next = new Set(prev)
+          next.add(status.project)
+          return next
+        })
+      } else if (status.status === "stopped") {
+        setRunningProjects(prev => {
+          const next = new Set(prev)
+          next.delete(status.project)
+          return next
+        })
+      }
+    })
+  }
 
   const handleOpenFile = async () => {
     setError(null)
@@ -50,12 +72,27 @@ function App() {
     }
   }
 
-  const handlePlay = (project: Project) => {
-    console.log(`Play project: ${project.name}`)
+  const handlePlay = async (project: Project) => {
+    try {
+      await webui.call("project.start", JSON.stringify({
+        path: project.path,
+        command: 0 // Use first command (dev/run)
+      }))
+    } catch (err) {
+      console.error("Failed to start project:", err)
+      setError(`Failed to start: ${err instanceof Error ? err.message : String(err)}`)
+    }
   }
 
-  const handleStop = (project: Project) => {
-    console.log(`Stop project: ${project.name}`)
+  const handleStop = async (project: Project) => {
+    try {
+      await webui.call("project.stop", JSON.stringify({
+        path: project.path
+      }))
+    } catch (err) {
+      console.error("Failed to stop project:", err)
+      setError(`Failed to stop: ${err instanceof Error ? err.message : String(err)}`)
+    }
   }
 
   return (
@@ -65,6 +102,7 @@ function App() {
         onOpenFile={handleOpenFile}
         onPlay={handlePlay}
         onStop={handleStop}
+        runningProjects={runningProjects}
       />
 
       <div class="flex-1 flex items-center justify-center p-8">

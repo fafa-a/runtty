@@ -17,6 +17,7 @@ interface SidebarProps {
   onOpenFile: () => void
   onPlay: (project: Project) => void
   onStop: (project: Project) => void
+  runningProjects?: () => Set<string>
 }
 
 export function Sidebar(props: SidebarProps) {
@@ -108,10 +109,10 @@ export function Sidebar(props: SidebarProps) {
                 <div class="pl-4 pr-2 py-2 bg-muted/50 rounded-md mt-1">
                   <div class="flex gap-2">
                     <Button
-                      variant="outline"
+                      variant={props.runningProjects?.().has(project.path) ? "default" : "outline"}
                       size="sm"
                       onClick={() => props.onPlay(project)}
-                      class="flex-1"
+                      class={`flex-1 ${props.runningProjects?.().has(project.path) ? "bg-green-600 hover:bg-green-700" : ""}`}
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -127,13 +128,14 @@ export function Sidebar(props: SidebarProps) {
                       >
                         <polygon points="5 3 19 12 5 21 5 3" />
                       </svg>
-                      Play
+                      {props.runningProjects?.().has(project.path) ? "Running" : "Play"}
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => props.onStop(project)}
                       class="flex-1"
+                      disabled={!props.runningProjects?.().has(project.path)}
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
