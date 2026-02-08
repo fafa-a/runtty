@@ -16,6 +16,37 @@ declare global {
   }
 }
 
+// API base URL - detect if running in WebUI or standalone
+const getApiBase = () => {
+  // If running in WebUI context, use relative URL
+  // Otherwise, we need to know the host URL
+  return ""
+}
+
+async function callApi(endpoint: string, body?: object): Promise<any> {
+  const url = endpoint.startsWith("http") ? endpoint : `${getApiBase()}${endpoint}`
+  
+  // Try window.webui first (WebUI context)
+  if (window.webui) {
+    const data = body ? JSON.stringify(body) : ""
+    const response = await window.webui.call(endpoint, data)
+    return JSON.parse(response)
+  }
+  
+  // Fallback: HTTP fetch for external browser
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${await response.text()}`)
+  }
+  
+  return response.json()
+}
+
 function App() {
   const [projects, setProjects] = createSignal<Project[]>([])
   const [error, setError] = createSignal<string | null>(null)
@@ -23,20 +54,12 @@ function App() {
   const handleOpenFile = async () => {
     setError(null)
 
-    // Check if running in WebUI context
-    if (!window.webui) {
-      setError("Not running in WebUI context - folder picker unavailable")
-      return
-    }
-
     try {
-      // Call Zig backend API
-      const response = await window.webui.call("/api/folder/pick")
-      const data = JSON.parse(response)
+      // Call backend API - works both in WebUI and external browser
+      const data = await callApi("/api/folder/pick")
 
       if (data.error) {
         if (data.error === "user_cancelled") {
-          // User cancelled - no error to show
           return
         }
         setError(`Error: ${data.error}`)
@@ -48,7 +71,6 @@ function App() {
         setError("No subdirectories found in selected folder")
         setProjects([])
       } else {
-        // Convert folder names to Project objects
         const newProjects = data.folders.map((name: string) => ({
           name,
           path: `${data.path}/${name}`,
@@ -58,18 +80,16 @@ function App() {
       }
     } catch (err) {
       console.error("Failed to pick folder:", err)
-      setError("Failed to open folder picker")
+      setError(`Failed: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
   const handlePlay = (project: Project) => {
     console.log(`Play project: ${project.name} at ${project.path}`)
-    // TODO: Call Zig API to run project
   }
 
   const handleStop = (project: Project) => {
     console.log(`Stop project: ${project.name}`)
-    // TODO: Call Zig API to stop project
   }
 
   return (
@@ -81,7 +101,6 @@ function App() {
         onStop={handleStop}
       />
 
-      {/* Main Content */}
       <div class="flex-1 flex items-center justify-center p-8">
         <div class="text-center">
           <h1 class="text-3xl font-bold mb-4">RunTTY</h1>
