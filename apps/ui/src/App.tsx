@@ -22,16 +22,16 @@ function App() {
   if (typeof webui !== 'undefined' && webui.bind) {
     webui.bind("project.status", (data: string) => {
       const status = JSON.parse(data)
-      if (status.status === "running") {
+      if (status.status === "running" && status.path) {
         setRunningProjects(prev => {
           const next = new Set(prev)
-          next.add(status.project)
+          next.add(status.path)
           return next
         })
-      } else if (status.status === "stopped") {
+      } else if (status.status === "stopped" && status.path) {
         setRunningProjects(prev => {
           const next = new Set(prev)
-          next.delete(status.project)
+          next.delete(status.path)
           return next
         })
       }
@@ -74,10 +74,20 @@ function App() {
 
   const handlePlay = async (project: Project) => {
     try {
-      await webui.call("project.start", JSON.stringify({
+      const response = await webui.call("project.start", JSON.stringify({
         path: project.path,
         command: 0 // Use first command (dev/run)
       }))
+      const data = JSON.parse(response)
+      
+      // Update running state immediately
+      if (data.status === "running") {
+        setRunningProjects(prev => {
+          const next = new Set(prev)
+          next.add(project.path)  // Use path as key
+          return next
+        })
+      }
     } catch (err) {
       console.error("Failed to start project:", err)
       setError(`Failed to start: ${err instanceof Error ? err.message : String(err)}`)
@@ -86,9 +96,19 @@ function App() {
 
   const handleStop = async (project: Project) => {
     try {
-      await webui.call("project.stop", JSON.stringify({
+      const response = await webui.call("project.stop", JSON.stringify({
         path: project.path
       }))
+      const data = JSON.parse(response)
+      
+      // Update running state immediately
+      if (data.status === "stopped") {
+        setRunningProjects(prev => {
+          const next = new Set(prev)
+          next.delete(project.path)  // Use path as key
+          return next
+        })
+      }
     } catch (err) {
       console.error("Failed to stop project:", err)
       setError(`Failed to stop: ${err instanceof Error ? err.message : String(err)}`)

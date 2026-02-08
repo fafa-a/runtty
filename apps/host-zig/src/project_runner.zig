@@ -390,7 +390,7 @@ fn startProjectHandler(project_path: []const u8, command_index: usize, e: *webui
     try procs.put(key, child);
 
     // Send success response
-    const response = try formatZ(alloc, "{{\"status\":\"running\",\"project\":\"{s}\",\"command\":\"{s}\",\"pid\":{any}}}", .{ info.name, cmd, child.id });
+    const response = try formatZ(alloc, "{{\"status\":\"running\",\"path\":\"{s}\",\"project\":\"{s}\",\"command\":\"{s}\",\"pid\":{any}}}", .{ project_path, info.name, cmd, child.id });
     defer alloc.free(response);
     e.returnString(response);
 
