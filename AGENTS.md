@@ -8,24 +8,51 @@ RunTTY is a terminal emulator with a modern web-based UI consisting of two compo
 
 ## Build Commands
 
-### UI (SolidJS)
+### Development Workflow (Full Stack with WebUI)
+
+**Important:** `window.webui` is only available when the UI is served by the Zig backend, not in Vite dev mode.
+
 ```bash
+# 1. Build UI for production (generates dist/ folder)
 cd apps/ui
-bun install          # Install dependencies
-bun run dev          # Start Vite dev server
-bun run build        # TypeScript compile + Vite build
-bun run preview      # Preview production build
+bun run build
+
+# 2. Run the Host (serves UI from dist/ with window.webui available)
+cd ../host-zig
+zig build run
 ```
 
-### Host (Zig)
+### UI Development Only (without Zig backend)
+
+```bash
+cd apps/ui
+bun run dev          # Start Vite dev server on localhost:5173
+                     # Note: window.webui will be unavailable
+                     # APIs will show "Not running in WebUI context"
+```
+
+### Production Build
+
+```bash
+cd apps/ui
+bun run build        # TypeScript compile + Vite build → dist/
+
+cd ../host-zig
+zig build            # Build executable
+zig build run        # Run and serve UI from dist/
+```
+
+### Host (Zig) Commands
+
 ```bash
 cd apps/host-zig
 zig build            # Build executable
-zig build run        # Build and run
+zig build run        # Build and run (serves UI from ../ui/dist)
 zig build test       # Run all tests
 ```
 
 ### Single Test (Zig)
+
 ```bash
 # Run a specific test by name
 zig test src/root.zig --test-filter "basic add functionality"
