@@ -15,7 +15,7 @@ pub fn getAllocator() std.mem.Allocator {
     return allocator.?;
 }
 
-/// Event handler: /api/folder/scan
+/// Event handler: folder.scan
 /// Body: { "path": "/home/fafa/workspace" }
 /// Response: { "path": "/home/fafa/workspace", "folders": ["a", "b"] }
 pub fn handleFolderScan(e: *webui.Event) void {
@@ -48,7 +48,7 @@ pub fn handleFolderScan(e: *webui.Event) void {
     e.returnString(response);
 }
 
-/// Event handler: /api/folder/pick
+/// Event handler: folder.pick
 /// Opens native file picker, scans selected folder, returns result
 /// Response: { "path": "/home/fafa/workspace", "folders": ["a", "b"] }
 pub fn handleFolderPick(e: *webui.Event) void {
@@ -89,13 +89,13 @@ pub fn handleFolderPick(e: *webui.Event) void {
     e.returnString(response);
 }
 
-/// Bind all API endpoints to a window
-pub fn bindApi(window: webui) void {
-    _ = window.bind("/api/folder/scan", handleFolderScan) catch |err| {
-        std.log.err("Failed to bind /api/folder/scan: {any}", .{err});
+/// Bind all handlers to a window
+pub fn bindHandlers(window: webui) void {
+    _ = window.bind("folder.scan", handleFolderScan) catch |err| {
+        std.log.err("Failed to bind folder.scan: {any}", .{err});
     };
-    _ = window.bind("/api/folder/pick", handleFolderPick) catch |err| {
-        std.log.err("Failed to bind /api/folder/pick: {any}", .{err});
+    _ = window.bind("folder.pick", handleFolderPick) catch |err| {
+        std.log.err("Failed to bind folder.pick: {any}", .{err});
     };
-    std.log.info("API endpoints bound", .{});
+    std.log.info("WebUI handlers bound", .{});
 }

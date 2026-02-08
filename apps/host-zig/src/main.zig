@@ -1,6 +1,6 @@
 const std = @import("std");
 const webui = @import("webui");
-const api = @import("api.zig");
+const handlers = @import("api.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -15,7 +15,7 @@ pub fn main() !void {
     std.log.info("CWD: {s}", .{cwd});
 
     const window = webui.newWindow();
-    api.bindApi(window);
+    handlers.bindHandlers(window);
 
     // Set fixed port 3210 for HTTP API and UI
     window.setPort(3210) catch |e| {

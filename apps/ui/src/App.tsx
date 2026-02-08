@@ -21,7 +21,7 @@ function App() {
 
     try {
       // Call backend via WebUI
-      const response = await webui.call("/api/folder/pick")
+      const response = await webui.call("folder.pick")
       const data = JSON.parse(response)
 
       if (data.error) {
