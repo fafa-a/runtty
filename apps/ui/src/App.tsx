@@ -7,44 +7,9 @@ interface Project {
   path: string
 }
 
-// WebUI global type
-declare global {
-  interface Window {
-    webui?: {
-      call: (eventId: string, data?: string) => Promise<string>
-    }
-  }
-}
-
-// API base URL - detect if running in WebUI or standalone
-const getApiBase = () => {
-  // If running in WebUI context, use relative URL
-  // Otherwise, we need to know the host URL
-  return ""
-}
-
-async function callApi(endpoint: string, body?: object): Promise<any> {
-  const url = endpoint.startsWith("http") ? endpoint : `${getApiBase()}${endpoint}`
-  
-  // Try window.webui first (WebUI context)
-  if (window.webui) {
-    const data = body ? JSON.stringify(body) : ""
-    const response = await window.webui.call(endpoint, data)
-    return JSON.parse(response)
-  }
-  
-  // Fallback: HTTP fetch for external browser
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: body ? JSON.stringify(body) : undefined,
-  })
-  
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${await response.text()}`)
-  }
-  
-  return response.json()
+// WebUI is loaded via script tag in index.html
+declare const webui: {
+  call: (eventId: string, data?: string) => Promise<string>
 }
 
 function App() {
@@ -55,8 +20,9 @@ function App() {
     setError(null)
 
     try {
-      // Call backend API - works both in WebUI and external browser
-      const data = await callApi("/api/folder/pick")
+      // Call backend via WebUI
+      const response = await webui.call("/api/folder/pick")
+      const data = JSON.parse(response)
 
       if (data.error) {
         if (data.error === "user_cancelled") {
@@ -68,7 +34,7 @@ function App() {
       }
 
       if (!data.folders || data.folders.length === 0) {
-        setError("No subdirectories found in selected folder")
+        setError("No subdirectories found")
         setProjects([])
       } else {
         const newProjects = data.folders.map((name: string) => ({
@@ -85,7 +51,7 @@ function App() {
   }
 
   const handlePlay = (project: Project) => {
-    console.log(`Play project: ${project.name} at ${project.path}`)
+    console.log(`Play project: ${project.name}`)
   }
 
   const handleStop = (project: Project) => {
