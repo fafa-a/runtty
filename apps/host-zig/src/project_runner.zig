@@ -137,7 +137,7 @@ pub fn startProject(project_path: []const u8, command_index: usize, window: webu
         return error.ProjectNotFound;
     }
 
-    var info = info_opt.?;
+    const info = info_opt.?;
 
     if (command_index >= info.commands.items.len) {
         std.log.err("Invalid command index", .{});
@@ -223,6 +223,7 @@ pub fn bindProjectHandlers(window: webui) void {
     // project.start handler
     _ = window.bind("project.start", struct {
         fn handler(e: *webui.Event) void {
+            _ = e;
             // TODO: Parse project path and command index from event
             std.log.info("Project start requested", .{});
         }
@@ -233,6 +234,7 @@ pub fn bindProjectHandlers(window: webui) void {
     // project.stop handler
     _ = window.bind("project.stop", struct {
         fn handler(e: *webui.Event) void {
+            _ = e;
             // TODO: Parse project path from event
             std.log.info("Project stop requested", .{});
         }
