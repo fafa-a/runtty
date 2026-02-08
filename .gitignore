@@ -1,0 +1,21 @@
+# Project management files
+PRD.md
+PROGRESS.md
+
+# Zig
+.zig-cache/
+.zig-out/
+
+# UI
+apps/ui/node_modules/
+apps/ui/dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
