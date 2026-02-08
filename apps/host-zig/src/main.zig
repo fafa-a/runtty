@@ -17,6 +17,10 @@ pub fn main() !void {
     const url = try window.startServer(ui_path);
     std.log.info("UI served at: {s}", .{url});
 
+    // Open the window with the served URL
+    try window.show(url);
+    std.log.info("Window opened", .{});
+
     // Wait until the window is closed
     webui.wait();
 }
