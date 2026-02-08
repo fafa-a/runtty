@@ -1,29 +1,32 @@
-# Feature: HTTP API for Folder Operations (Port 3210)
+# Feature: Real Process Spawn with std.process.Child
 
 ## Scope
 
 **In:**
-- HTTP server on fixed port 3210
-- POST /api/folder/pick endpoint (opens zenity + scans + returns JSON)
-- Keep WebUI for launching Firefox at startup
-- Port 3210 used for both HTTP API and serving the UI
+- Spawn actual process with std.process.Child
+- Capture PID for stop capability
+- Stream stdout/stderr to UI via webui.send()
+- Handle process exit (success/error)
+- Store running processes in HashMap
 
 **Out:**
-- WebSocket (not needed yet)
-- Dynamic port allocation
-- CORS handling (localhost only)
+- Process restart on crash
+- Multiple parallel processes per project
+- Environment variables injection
+- Working directory change after start
 
 ## DoD
-- [ ] Backend listens on port 3210
-- [ ] POST /api/folder/pick works via HTTP
-- [ ] Frontend fetch() succeeds
-- [ ] Firefox opens automatically (WebUI)
-- [ ] JSON response format correct
+- [ ] Process actually starts when clicking Play
+- [ ] Logs appear in UI in real-time
+- [ ] Stop button kills the process
+- [ ] UI shows "Running" only while process is alive
+- [ ] Process exit updates UI to "Stopped"
 
 ## Tasks
 
-- [ ] T1 — Set fixed port 3210 in main.zig
-- [ ] T2 — Create HTTP request handler in api.zig
-- [ ] T3 — Implement folder pick endpoint with zenity
-- [ ] T4 — Serve UI from same port 3210
-- [ ] T5 — Test end-to-end
+- [ ] T1 — Modify ProjectInfo to store Child process
+- [ ] T2 — Spawn process in startProjectHandler with pipes
+- [ ] T3 — Create thread to read stdout/stderr and send to UI
+- [ ] T4 — Implement stopProjectHandler with process.kill()
+- [ ] T5 — Monitor process exit and update UI status
+- [ ] T6 — Test with real project (npm run dev, cargo run, etc.)
