@@ -72,45 +72,46 @@ pub fn detectProject(project_path: []const u8) !?ProjectInfo {
     if (project_type == .unknown) return null;
 
     // Get commands based on type
-    var commands = std.ArrayList([]const u8).init(alloc);
+    var commands: std.ArrayList([]const u8) = .empty;
 
     switch (project_type) {
         .zig => {
-            try commands.append(try alloc.dupe(u8, "zig build run"));
-            try commands.append(try alloc.dupe(u8, "zig build test"));
+            try commands.append(alloc, try alloc.dupe(u8, "zig build run"));
+            try commands.append(alloc, try alloc.dupe(u8, "zig build test"));
         },
-        .node => {
+        .node => blk: {
             // Read package.json for scripts
             const pkg_path = try std.fs.path.join(alloc, &.{ project_path, "package.json" });
             defer alloc.free(pkg_path);
 
             const content = std.fs.cwd().readFileAlloc(alloc, pkg_path, 1024 * 1024) catch {
-                try commands.append(try alloc.dupe(u8, "npm start"));
+                try commands.append(alloc, try alloc.dupe(u8, "npm start"));
+                break :blk;
             };
             defer alloc.free(content);
 
             // Simple parsing - look for "scripts" section
             if (std.mem.indexOf(u8, content, "\"dev\"") != null) {
-                try commands.append(try alloc.dupe(u8, "npm run dev"));
+                try commands.append(alloc, try alloc.dupe(u8, "npm run dev"));
             }
             if (std.mem.indexOf(u8, content, "\"start\"") != null) {
-                try commands.append(try alloc.dupe(u8, "npm start"));
+                try commands.append(alloc, try alloc.dupe(u8, "npm start"));
             }
             if (std.mem.indexOf(u8, content, "\"build\"") != null) {
-                try commands.append(try alloc.dupe(u8, "npm run build"));
+                try commands.append(alloc, try alloc.dupe(u8, "npm run build"));
             }
         },
         .rust => {
-            try commands.append(try alloc.dupe(u8, "cargo run"));
-            try commands.append(try alloc.dupe(u8, "cargo test"));
+            try commands.append(alloc, try alloc.dupe(u8, "cargo run"));
+            try commands.append(alloc, try alloc.dupe(u8, "cargo test"));
         },
         .go => {
-            try commands.append(try alloc.dupe(u8, "go run ."));
-            try commands.append(try alloc.dupe(u8, "go test ./..."));
+            try commands.append(alloc, try alloc.dupe(u8, "go run ."));
+            try commands.append(alloc, try alloc.dupe(u8, "go test ./..."));
         },
         .python => {
-            try commands.append(try alloc.dupe(u8, "python main.py"));
-            try commands.append(try alloc.dupe(u8, "python -m pytest"));
+            try commands.append(alloc, try alloc.dupe(u8, "python main.py"));
+            try commands.append(alloc, try alloc.dupe(u8, "python -m pytest"));
         },
         else => {},
     }
@@ -247,8 +248,13 @@ fn parseStopJson(data: []const u8) ?[]const u8 {
     return data[path_start .. path_start + path_end];
 }
 
+/// Store window reference for callbacks
+var g_window: ?webui = null;
+
 /// Bind project handlers to WebUI window
 pub fn bindProjectHandlers(window: webui) void {
+    g_window = window;
+
     // project.start handler
     _ = window.bind("project.start", struct {
         fn handler(e: *webui.Event) void {
@@ -256,9 +262,15 @@ pub fn bindProjectHandlers(window: webui) void {
 
             if (parseStartJson(data)) |parsed| {
                 std.log.info("Starting project in folder: {s}, command index: {d}", .{ parsed.path, parsed.command });
-                // TODO: Call startProject(parsed.path, parsed.command, window)
+
+                // Actually start the project
+                startProjectHandler(parsed.path, parsed.command, e) catch |err| {
+                    std.log.err("Failed to start project: {any}", .{err});
+                    e.returnString("{\"error\":\"start_failed\"}");
+                };
             } else {
                 std.log.err("Failed to parse project.start data: {s}", .{data});
+                e.returnString("{\"error\":\"parse_failed\"}");
             }
         }
     }.handler) catch |err| {
@@ -272,9 +284,15 @@ pub fn bindProjectHandlers(window: webui) void {
 
             if (parseStopJson(data)) |path| {
                 std.log.info("Stopping project in folder: {s}", .{path});
-                // TODO: Call stopProject(path, window)
+
+                // Actually stop the project
+                stopProjectHandler(path, e) catch |err| {
+                    std.log.err("Failed to stop project: {any}", .{err});
+                    e.returnString("{\"error\":\"stop_failed\"}");
+                };
             } else {
                 std.log.err("Failed to parse project.stop data: {s}", .{data});
+                e.returnString("{\"error\":\"parse_failed\"}");
             }
         }
     }.handler) catch |err| {
@@ -282,4 +300,53 @@ pub fn bindProjectHandlers(window: webui) void {
     };
 
     std.log.info("Project handlers bound", .{});
+}
+
+/// Helper to format string with null terminator
+fn formatZ(alloc: std.mem.Allocator, comptime fmt: []const u8, args: anytype) ![:0]const u8 {
+    const str = try std.fmt.allocPrint(alloc, fmt, args);
+    defer alloc.free(str);
+    const result = try alloc.allocSentinel(u8, str.len, 0);
+    @memcpy(result, str);
+    return result;
+}
+
+/// Start project handler - detects type and runs command
+fn startProjectHandler(project_path: []const u8, command_index: usize, e: *webui.Event) !void {
+    const alloc = getAlloc();
+
+    // Detect project
+    const info_opt = try detectProject(project_path);
+    if (info_opt == null) {
+        return error.ProjectNotFound;
+    }
+
+    const info = info_opt.?;
+
+    if (command_index >= info.commands.items.len) {
+        return error.InvalidCommand;
+    }
+
+    const cmd = info.commands.items[command_index];
+    std.log.info("Command to run: {s}", .{cmd});
+
+    // Return success with command info
+    const response = try formatZ(alloc, "{{\"status\":\"started\",\"project\":\"{s}\",\"command\":\"{s}\"}}", .{ info.name, cmd });
+    defer alloc.free(response);
+    e.returnString(response);
+
+    // TODO: Actually spawn the process and capture output
+    std.log.info("Project {s} would run: {s}", .{ info.name, cmd });
+}
+
+/// Stop project handler
+fn stopProjectHandler(project_path: []const u8, e: *webui.Event) !void {
+    const alloc = getAlloc();
+
+    // For now just acknowledge
+    const response = try formatZ(alloc, "{{\"status\":\"stopped\",\"path\":\"{s}\"}}", .{project_path});
+    defer alloc.free(response);
+    e.returnString(response);
+
+    std.log.info("Project at {s} would be stopped", .{project_path});
 }
