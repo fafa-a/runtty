@@ -1,0 +1,4 @@
+- Status: in_progress
+- Done: T1
+- Next: T2
+- Notes: Port 3210 set and building. Need to implement HTTP handler for /api/folder/pick endpoint.

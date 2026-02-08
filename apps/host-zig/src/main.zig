@@ -1,6 +1,6 @@
 const std = @import("std");
 const webui = @import("webui");
-const handlers = @import("api.zig");
+const handlers = @import("rpc.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
