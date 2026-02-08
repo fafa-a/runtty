@@ -218,14 +218,48 @@ pub fn stopProject(project_path: []const u8, window: webui) !void {
     }
 }
 
+/// Parse simple JSON to extract path and command
+fn parseStartJson(data: []const u8) ?struct { path: []const u8, command: usize } {
+    // Simple parsing: look for "path":"..." and "command":N
+    const path_prefix = "\"path\":\"";
+    const cmd_prefix = "\"command\":";
+
+    var path_start = std.mem.indexOf(u8, data, path_prefix) orelse return null;
+    path_start += path_prefix.len;
+    const path_end = std.mem.indexOf(u8, data[path_start..], "\"") orelse return null;
+    const path = data[path_start .. path_start + path_end];
+
+    var cmd_start = std.mem.indexOf(u8, data, cmd_prefix) orelse return null;
+    cmd_start += cmd_prefix.len;
+    const cmd_end = std.mem.indexOfAny(u8, data[cmd_start..], ",}") orelse data.len - cmd_start;
+    const cmd_str = data[cmd_start .. cmd_start + cmd_end];
+    const command = std.fmt.parseInt(usize, cmd_str, 10) catch 0;
+
+    return .{ .path = path, .command = command };
+}
+
+/// Parse simple JSON to extract path
+fn parseStopJson(data: []const u8) ?[]const u8 {
+    const path_prefix = "\"path\":\"";
+    var path_start = std.mem.indexOf(u8, data, path_prefix) orelse return null;
+    path_start += path_prefix.len;
+    const path_end = std.mem.indexOf(u8, data[path_start..], "\"") orelse return null;
+    return data[path_start .. path_start + path_end];
+}
+
 /// Bind project handlers to WebUI window
 pub fn bindProjectHandlers(window: webui) void {
     // project.start handler
     _ = window.bind("project.start", struct {
         fn handler(e: *webui.Event) void {
-            _ = e;
-            // TODO: Parse project path and command index from event
-            std.log.info("Project start requested", .{});
+            const data = e.getString();
+
+            if (parseStartJson(data)) |parsed| {
+                std.log.info("Starting project in folder: {s}, command index: {d}", .{ parsed.path, parsed.command });
+                // TODO: Call startProject(parsed.path, parsed.command, window)
+            } else {
+                std.log.err("Failed to parse project.start data: {s}", .{data});
+            }
         }
     }.handler) catch |err| {
         std.log.err("Failed to bind project.start: {any}", .{err});
@@ -234,9 +268,14 @@ pub fn bindProjectHandlers(window: webui) void {
     // project.stop handler
     _ = window.bind("project.stop", struct {
         fn handler(e: *webui.Event) void {
-            _ = e;
-            // TODO: Parse project path from event
-            std.log.info("Project stop requested", .{});
+            const data = e.getString();
+
+            if (parseStopJson(data)) |path| {
+                std.log.info("Stopping project in folder: {s}", .{path});
+                // TODO: Call stopProject(path, window)
+            } else {
+                std.log.err("Failed to parse project.stop data: {s}", .{data});
+            }
         }
     }.handler) catch |err| {
         std.log.err("Failed to bind project.stop: {any}", .{err});
