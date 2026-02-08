@@ -85,20 +85,20 @@ pub fn detectProject(project_path: []const u8) !?ProjectInfo {
             defer alloc.free(pkg_path);
 
             const content = std.fs.cwd().readFileAlloc(alloc, pkg_path, 1024 * 1024) catch {
-                try commands.append(alloc, try alloc.dupe(u8, "npm start"));
+                try commands.append(alloc, try alloc.dupe(u8, "bun start"));
                 break :blk;
             };
             defer alloc.free(content);
 
             // Simple parsing - look for "scripts" section
             if (std.mem.indexOf(u8, content, "\"dev\"") != null) {
-                try commands.append(alloc, try alloc.dupe(u8, "npm run dev"));
+                try commands.append(alloc, try alloc.dupe(u8, "bun run dev"));
             }
             if (std.mem.indexOf(u8, content, "\"start\"") != null) {
-                try commands.append(alloc, try alloc.dupe(u8, "npm start"));
+                try commands.append(alloc, try alloc.dupe(u8, "bun start"));
             }
             if (std.mem.indexOf(u8, content, "\"build\"") != null) {
-                try commands.append(alloc, try alloc.dupe(u8, "npm run build"));
+                try commands.append(alloc, try alloc.dupe(u8, "bun run build"));
             }
         },
         .rust => {
