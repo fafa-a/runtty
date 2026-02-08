@@ -2,90 +2,78 @@ import { createSignal } from "solid-js"
 import { Sidebar } from "~/components/ui/sidebar"
 import "./App.css"
 
-// Déclaration pour webkitdirectory
-declare module "solid-js" {
-  namespace JSX {
-    interface InputHTMLAttributes<T> {
-      webkitdirectory?: boolean
-      directory?: boolean
-    }
-  }
-}
-
 interface Project {
   name: string
   path: string
 }
 
+// WebUI global type
+declare global {
+  interface Window {
+    webui?: {
+      call: (eventId: string, data?: string) => Promise<string>
+    }
+  }
+}
+
 function App() {
   const [projects, setProjects] = createSignal<Project[]>([])
   const [error, setError] = createSignal<string | null>(null)
-  let inputRef: HTMLInputElement | undefined
 
-  const handleOpenFile = () => {
+  const handleOpenFile = async () => {
     setError(null)
-    inputRef?.click()
-  }
 
-  const handleFileSelect = (e: Event) => {
-    const target = e.target as HTMLInputElement
-    const files = target.files
-    console.log("files", files)
-
-    if (!files || files.length === 0) {
-      target.value = ""
+    // Check if running in WebUI context
+    if (!window.webui) {
+      setError("Not running in WebUI context - folder picker unavailable")
       return
     }
 
-    // Extraire les noms des sous-dossiers (niveau 1) depuis webkitRelativePath
-    // Structure: selected-folder/subdirectory/file.txt
-    // parts[0] = dossier sélectionné, parts[1] = sous-dossier (ce qu'on veut)
-    const folderNames = new Set<string>()
-    for (const file of files) {
-      const path = file.webkitRelativePath
-      if (path) {
-        const parts = path.split("/")
-        // On veut les enfants (parts[1]), pas le dossier sélectionné (parts[0])
-        if (parts.length > 2) {
-          folderNames.add(parts[1])
+    try {
+      // Call Zig backend API
+      const response = await window.webui.call("/api/folder/pick")
+      const data = JSON.parse(response)
+
+      if (data.error) {
+        if (data.error === "user_cancelled") {
+          // User cancelled - no error to show
+          return
         }
+        setError(`Error: ${data.error}`)
+        setProjects([])
+        return
       }
-    }
 
-    if (folderNames.size === 0) {
-      setError("No subdirectories found")
-      setProjects([])
-    } else {
-      const newProjects = Array.from(folderNames)
-        .sort()
-        .map((name) => ({ name, path: name }))
-      setProjects(newProjects)
-      setError(null)
+      if (!data.folders || data.folders.length === 0) {
+        setError("No subdirectories found in selected folder")
+        setProjects([])
+      } else {
+        // Convert folder names to Project objects
+        const newProjects = data.folders.map((name: string) => ({
+          name,
+          path: `${data.path}/${name}`,
+        }))
+        setProjects(newProjects)
+        setError(null)
+      }
+    } catch (err) {
+      console.error("Failed to pick folder:", err)
+      setError("Failed to open folder picker")
     }
-
-    // Reset input pour permettre re-sélection du même dossier
-    target.value = ""
   }
 
   const handlePlay = (project: Project) => {
-    console.log(`Play project: ${project.name}`)
+    console.log(`Play project: ${project.name} at ${project.path}`)
+    // TODO: Call Zig API to run project
   }
 
   const handleStop = (project: Project) => {
     console.log(`Stop project: ${project.name}`)
+    // TODO: Call Zig API to stop project
   }
 
   return (
     <div class="h-screen flex bg-background text-foreground">
-      {/* Input caché pour sélection de dossier */}
-      <input
-        ref={inputRef}
-        type="file"
-        webkitdirectory
-        style={{ display: "none" }}
-        onChange={handleFileSelect}
-      />
-
       <Sidebar
         projects={projects()}
         onOpenFile={handleOpenFile}
