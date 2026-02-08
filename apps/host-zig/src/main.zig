@@ -12,6 +12,9 @@ pub fn main() !void {
     // Bind API endpoints
     api.bindApi(window);
 
+    // Allow access from public network (0.0.0.0 instead of 127.0.0.1)
+    window.setPublic(true);
+
     // Serve the UI from the dist folder
     const ui_path = "../ui/dist";
     const url = try window.startServer(ui_path);
