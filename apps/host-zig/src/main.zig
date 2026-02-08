@@ -17,11 +17,10 @@ pub fn main() !void {
     const url = try window.startServer(ui_path);
     std.log.info("UI served at: {s}", .{url});
 
-    // Show in Firefox (most reliable on Linux)
-    // Force Firefox to avoid WebView issues
-    std.log.info("Opening Firefox...", .{});
-    try window.showBrowser(url, .Firefox);
-    std.log.info("Firefox opened", .{});
+    // Open URL in default browser
+    std.log.info("Opening browser...", .{});
+    webui.openUrl(url);
+    std.log.info("Browser opened", .{});
 
     // Wait until the window is closed
     webui.wait();
