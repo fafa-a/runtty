@@ -20,10 +20,10 @@ pub fn main() !void {
     const url = try window.startServer(ui_path);
     std.log.info("UI served at: {s}", .{url});
 
-    // Open URL in default browser
-    std.log.info("Opening browser...", .{});
-    webui.openUrl(url);
-    std.log.info("Browser opened", .{});
+    // Show window with the URL
+    std.log.info("Opening window...", .{});
+    try window.show(url);
+    std.log.info("Window opened", .{});
 
     // Wait until the window is closed
     webui.wait();
