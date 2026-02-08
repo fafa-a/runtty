@@ -32,4 +32,7 @@ echo -e "${GREEN}✓ Starting webui server${NC}"
 echo -e "${YELLOW}Press Ctrl+C to stop${NC}"
 echo ""
 
+# Force X11 backend to avoid Wayland issues
+export GDK_BACKEND=x11
+# Alternative: use WebUI's default browser detection
 zig build run
