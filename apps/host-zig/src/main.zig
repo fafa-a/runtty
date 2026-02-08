@@ -17,6 +17,12 @@ pub fn main() !void {
     const window = webui.newWindow();
     api.bindApi(window);
 
+    // Set fixed port 3210 for HTTP API and UI
+    window.setPort(3210) catch |e| {
+        std.log.err("Failed to set port 3210: {any}", .{e});
+        return e;
+    };
+
     // Serve UI on all interfaces so external browser can connect
     window.setPublic(true);
 
@@ -26,13 +32,8 @@ pub fn main() !void {
         return e;
     };
 
-    const raw_url = try window.startServer(ui_path);
-    // Convert 192.168.x.x to 127.0.0.1 for local browser
-    const localhost_url = try std.mem.replaceOwned(u8, alloc, raw_url, "192.168.1.18", "127.0.0.1");
-    defer alloc.free(localhost_url);
-    // Convert to null-terminated string
-    const url = try alloc.dupeZ(u8, localhost_url);
-    defer alloc.free(url);
+    _ = try window.startServer(ui_path);
+    const url = "http://127.0.0.1:3210";
     std.log.info("UI available at: {s}", .{url});
 
     // Open Firefox (WebView doesn't work in this environment)
