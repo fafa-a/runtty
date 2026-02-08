@@ -155,7 +155,7 @@ pub fn startProject(project_path: []const u8, command_index: usize, window: webu
     var it = std.mem.splitScalar(u8, cmd, ' ');
     while (it.next()) |arg| {
         if (arg.len > 0) {
-            try argv.append(arg);
+            try argv.append(alloc, arg);
         }
     }
 
@@ -311,7 +311,36 @@ fn formatZ(alloc: std.mem.Allocator, comptime fmt: []const u8, args: anytype) ![
     return result;
 }
 
-/// Start project handler - detects type and runs command
+/// Store for running processes
+var running_processes: ?std.StringHashMap(std.process.Child) = null;
+
+fn getRunningProcesses() !*std.StringHashMap(std.process.Child) {
+    if (running_processes == null) {
+        running_processes = std.StringHashMap(std.process.Child).init(getAlloc());
+    }
+    return &running_processes.?;
+}
+
+/// Read logs from process stdout/stderr and send to UI
+fn logReaderThread(child: *std.process.Child, window: webui, project_name: []const u8) void {
+    const alloc = getAlloc();
+
+    // Read stdout
+    if (child.stdout) |stdout| {
+        var buf: [1024]u8 = undefined;
+        while (true) {
+            const bytes_read = stdout.read(&buf) catch break;
+            if (bytes_read == 0) break;
+
+            const log_msg = std.fmt.allocPrintZ(alloc, "{{\"type\":\"log\",\"project\":\"{s}\",\"data\":\"{s}\"}}", .{ project_name, buf[0..bytes_read] }) catch continue;
+            defer alloc.free(log_msg);
+
+            window.send("project.log", log_msg);
+        }
+    }
+}
+
+/// Start project handler - actually spawns the process
 fn startProjectHandler(project_path: []const u8, command_index: usize, e: *webui.Event) !void {
     const alloc = getAlloc();
 
@@ -328,25 +357,73 @@ fn startProjectHandler(project_path: []const u8, command_index: usize, e: *webui
     }
 
     const cmd = info.commands.items[command_index];
-    std.log.info("Command to run: {s}", .{cmd});
+    std.log.info("Starting: {s}", .{cmd});
 
-    // Return success with command info
-    const response = try formatZ(alloc, "{{\"status\":\"started\",\"project\":\"{s}\",\"command\":\"{s}\"}}", .{ info.name, cmd });
+    // Parse command into argv
+    var argv: std.ArrayList([]const u8) = .empty;
+    defer argv.deinit(alloc);
+
+    var it = std.mem.splitScalar(u8, cmd, ' ');
+    while (it.next()) |arg| {
+        if (arg.len > 0) {
+            try argv.append(alloc, arg);
+        }
+    }
+
+    if (argv.items.len == 0) {
+        return error.EmptyCommand;
+    }
+
+    // Spawn process
+    var child = std.process.Child.init(argv.items, alloc);
+    child.cwd = project_path;
+    child.stdout_behavior = .Pipe;
+    child.stderr_behavior = .Pipe;
+
+    try child.spawn();
+
+    std.log.info("Process spawned with PID: {any}", .{child.id});
+
+    // Store in running processes
+    const procs = try getRunningProcesses();
+    const key = try alloc.dupe(u8, project_path);
+    try procs.put(key, child);
+
+    // Send success response
+    const response = try formatZ(alloc, "{{\"status\":\"running\",\"project\":\"{s}\",\"command\":\"{s}\",\"pid\":{any}}}", .{ info.name, cmd, child.id });
     defer alloc.free(response);
     e.returnString(response);
 
-    // TODO: Actually spawn the process and capture output
-    std.log.info("Project {s} would run: {s}", .{ info.name, cmd });
+    // TODO: Spawn thread to read logs
+    // const window = g_window.?;
+    // _ = std.Thread.spawn(.{}, logReaderThread, .{ &child, window, info.name });
 }
 
-/// Stop project handler
+/// Stop project handler - actually kills the process
 fn stopProjectHandler(project_path: []const u8, e: *webui.Event) !void {
     const alloc = getAlloc();
+    const procs = try getRunningProcesses();
 
-    // For now just acknowledge
+    const entry = procs.getPtr(project_path) orelse {
+        std.log.warn("No running process for: {s}", .{project_path});
+        e.returnString("{\"error\":\"not_running\"}");
+        return;
+    };
+
+    // Kill the process
+    _ = entry.kill() catch |err| {
+        std.log.err("Failed to kill process: {any}", .{err});
+        e.returnString("{\"error\":\"kill_failed\"}");
+        return;
+    };
+
+    std.log.info("Process killed for: {s}", .{project_path});
+
+    // Remove from running processes
+    _ = procs.remove(project_path);
+
+    // Send success response
     const response = try formatZ(alloc, "{{\"status\":\"stopped\",\"path\":\"{s}\"}}", .{project_path});
     defer alloc.free(response);
     e.returnString(response);
-
-    std.log.info("Project at {s} would be stopped", .{project_path});
 }
