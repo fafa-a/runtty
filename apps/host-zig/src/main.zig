@@ -17,11 +17,11 @@ pub fn main() !void {
     const url = try window.startServer(ui_path);
     std.log.info("UI served at: {s}", .{url});
 
-    // Show in any available browser (Firefox, Chrome, etc.)
-    // This avoids WebView issues on Wayland
-    const browser = window.getBestBrowser();
-    try window.showBrowser(url, browser);
-    std.log.info("Browser opened: {any}", .{browser});
+    // Show in Firefox (most reliable on Linux)
+    // Force Firefox to avoid WebView issues
+    std.log.info("Opening Firefox...", .{});
+    try window.showBrowser(url, .Firefox);
+    std.log.info("Firefox opened", .{});
 
     // Wait until the window is closed
     webui.wait();
